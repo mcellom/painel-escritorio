@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Instalador do PDV — Jardim das Ervas</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!--
+  🔗 Página do LINK DO INSTALADOR (14/10/2026). O Painel gera
+  instalador.html#t=<token> (24 h, 1 download). O token fica no # (não vai a servidor
+  nenhum; a prévia do WhatsApp não o gasta). Só o clique em "Baixar" gasta: POST na
+  Edge instalador-baixar, que devolve um endereço assinado do arquivo (5 min).
+-->
+<style>
+  :root { --bg: #061009; --card: #07160d; --borda: #526034; --ouro: #e3c675; --lima: #b6da39; --texto: #f0ede5; --sec: #cfc8b8; --mudo: #92998a; --erro: #ff8a70; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--bg); color: var(--texto); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { width: 100%; max-width: 480px; background: var(--card); border: 1px solid var(--borda); border-radius: 16px; padding: 24px; }
+  h1 { color: var(--ouro); font-size: 22px; margin: 0 0 8px; }
+  p { line-height: 1.5; color: var(--sec); margin: 8px 0; }
+  .nota { font-size: 13px; color: var(--mudo); }
+  button { width: 100%; margin-top: 16px; padding: 16px; border: 0; border-radius: 12px; background: var(--lima); color: #0b1406; font-size: 18px; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: .55; cursor: default; }
+  .msg { margin-top: 14px; font-weight: 600; }
+  .msg.erro { color: var(--erro); }
+  .msg.ok { color: var(--lima); }
+  ol { color: var(--sec); padding-left: 20px; line-height: 1.6; }
+  a { color: var(--ouro); }
+</style>
+</head>
+<body>
+<main>
+  <h1>🌿 Instalador do PDV</h1>
+  <p>Jardim das Ervas · com os drivers da balança e das impressoras (cerca de 107 MB).</p>
+  <p class="nota">Este link vale 24 horas e um download. Baixe no PC que vai ser instalado.</p>
+  <button id="baixar" type="button">⬇ Baixar o instalador</button>
+  <p id="msg" class="msg" role="status"></p>
+  <div id="depois" hidden>
+    <ol>
+      <li>Abra o arquivo <b>JardimDasErvas-PDV-Setup.exe</b> que baixou.</li>
+      <li>Se o Windows mostrar "O Windows protegeu o computador", toque em <b>Mais informações → Executar assim mesmo</b>.</li>
+      <li>Escolha <b>Loja</b> (ou CD / Escritório) e siga até o fim.</li>
+      <li>No 1º uso, toque em <b>🧰 Pedir a instalação ao escritório</b> e digite o código da empresa.</li>
+    </ol>
+  </div>
+</main>
+<script>
+(function () {
+  var API = "https://osnhrryofwcqwzqgrxuc.supabase.co/functions/v1/instalador-baixar";
+  var MSG = {
+    invalido: "Este link não está completo ou não existe. Peça um link novo ao escritório.",
+    expirado: "Este link venceu (vale 24 horas). Peça um link novo ao escritório.",
+    usado: "Este link já foi usado para baixar. Cada link vale um download — peça um novo ao escritório.",
+    indisponivel: "O instalador não está no servidor agora. Avise o escritório.",
+    servidor: "O servidor não respondeu. Tente de novo em instantes (o link continua valendo)."
+  };
+  var m = /(?:^|[#&])t=([A-Za-z0-9_-]{30,80})/.exec(location.hash || "");
+  var token = m ? m[1] : "";
+  var botao = document.getElementById("baixar");
+  var msg = document.getElementById("msg");
+  var depois = document.getElementById("depois");
+  function mostrar(texto, classe) { msg.textContent = texto; msg.className = "msg" + (classe ? " " + classe : ""); }
+  if (!token) { botao.disabled = true; mostrar(MSG.invalido, "erro"); return; }
+  botao.onclick = function () {
+    botao.disabled = true;
+    mostrar("Preparando o download…");
+    fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t: token }) })
+      .then(function (r) { return r.json().catch(function () { return { erro: "servidor" }; }); })
+      .then(function (r) {
+        if (r && r.ok && r.url) {
+          mostrar("✓ O download começou. Se não começar, ", "ok");
+          var a = document.createElement("a"); a.href = r.url; a.textContent = "toque aqui"; a.rel = "noopener";
+          msg.appendChild(a); msg.appendChild(document.createTextNode(" (vale 5 minutos)."));
+          depois.hidden = false;
+          location.href = r.url;
+          // pode baixar de novo por 15 minutos se o download cair no meio
+          setTimeout(function () { botao.disabled = false; botao.textContent = "⬇ Baixar de novo"; }, 5000);
+        } else {
+          mostrar(MSG[(r && r.erro) || "servidor"] || MSG.servidor, "erro");
+          if (r && r.erro === "servidor") botao.disabled = false;
+        }
+      })
+      .catch(function () { mostrar(MSG.servidor, "erro"); botao.disabled = false; });
+  };
+})();
+</script>
+</body>
+</html>
