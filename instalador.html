@@ -9,7 +9,8 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!--
   🔗 Página do LINK DO INSTALADOR (14/10/2026). O Painel gera
-  instalador.html#t=<token> (24 h, 1 download). O token fica no # (não vai a servidor
+  instalador.html#t=<token> (24 h, 1 download). 27/10: o "🔗 Link de instalação" junta
+  &c=<código do convite>&a=<acesso> — a página mostra o acesso e o código a digitar. O token fica no # (não vai a servidor
   nenhum; a prévia do WhatsApp não o gasta). Só o clique em "Baixar" gasta: POST na
   Edge instalador-baixar, que devolve um endereço assinado do arquivo (5 min).
 -->
@@ -28,12 +29,16 @@
   .msg.ok { color: var(--lima); }
   ol { color: var(--sec); padding-left: 20px; line-height: 1.6; }
   a { color: var(--ouro); }
+  .acesso { color: var(--texto); font-weight: 600; }
+  .codigo { margin-top: 14px; padding: 12px; border: 1px solid var(--borda); border-radius: 12px; text-align: center; }
+  .codigo b { display: block; margin-top: 4px; font-family: ui-monospace, Consolas, monospace; font-size: 26px; letter-spacing: 3px; color: var(--ouro); }
 </style>
 </head>
 <body>
 <main>
   <h1>🌿 Instalador do PDV</h1>
   <p>Jardim das Ervas · com os drivers da balança e das impressoras (cerca de 107 MB).</p>
+  <p id="acesso" class="acesso" hidden></p>
   <p class="nota">Este link vale 24 horas e um download. Baixe no PC que vai ser instalado.</p>
   <button id="baixar" type="button">⬇ Baixar o instalador</button>
   <p id="msg" class="msg" role="status"></p>
@@ -42,9 +47,11 @@
       <li>Abra o arquivo <b>JardimDasErvas-PDV-Setup.exe</b> que baixou.</li>
       <li>Se o Windows mostrar "O Windows protegeu o computador", toque em <b>Mais informações → Executar assim mesmo</b>.</li>
       <li>Escolha <b>Loja</b> (ou CD / Escritório) e siga até o fim.</li>
-      <li>No 1º uso, toque em <b>🧰 Pedir a instalação ao escritório</b> e digite o código da empresa.</li>
+      <li id="passo-sem-convite">No 1º uso, toque em <b>🧰 Pedir a instalação ao escritório</b> e digite o código da empresa.</li>
+      <li id="passo-convite" hidden>No 1º uso, toque em <b>✉️ Tenho um convite</b> e digite o código abaixo. Aparecem 4 números: confira com quem mandou o link.</li>
     </ol>
   </div>
+  <p id="codigo" class="codigo" hidden>Código do convite: <b id="codigo-valor"></b></p>
 </main>
 <script>
 (function () {
@@ -58,6 +65,21 @@
   };
   var m = /(?:^|[#&])t=([A-Za-z0-9_-]{30,80})/.exec(location.hash || "");
   var token = m ? m[1] : "";
+  // 27/10: o link de instalação já vem ligado a um acesso e leva o código do convite (no #)
+  var ACESSOS = { caixa: "🧾 PDV Caixa", pesador: "⚖️ PDV Balança", cd: "📦 PDV CD", escritorio: "🏢 PDV Escritório" };
+  var mc = /(?:^|[#&])c=([2-9A-HJKMNP-TV-Z]{12})(?:&|$)/.exec(location.hash || "");
+  var ma = /(?:^|[#&])a=([a-z]+)(?:&|$)/.exec(location.hash || "");
+  if (mc) {
+    document.getElementById("codigo-valor").textContent = mc[1].replace(/(.{4})(?=.)/g, "$1-");
+    document.getElementById("codigo").hidden = false;
+    document.getElementById("passo-convite").hidden = false;
+    document.getElementById("passo-sem-convite").hidden = true;
+  }
+  if (ma && Object.prototype.hasOwnProperty.call(ACESSOS, ma[1])) {
+    var ac = document.getElementById("acesso");
+    ac.textContent = "Este link instala: " + ACESSOS[ma[1]];
+    ac.hidden = false;
+  }
   var botao = document.getElementById("baixar");
   var msg = document.getElementById("msg");
   var depois = document.getElementById("depois");
