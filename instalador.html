@@ -11,7 +11,9 @@
   🔗 Página do LINK DO INSTALADOR (14/10/2026). O Painel gera
   instalador.html#t=<token> (24 h, 1 download). 27/10: o "🔗 Link de instalação" junta
   &c=<código do convite>&a=<acesso> — a página mostra o acesso e o código a digitar. O token fica no # (não vai a servidor
-  nenhum; a prévia do WhatsApp não o gasta). Só o clique em "Baixar" gasta: POST na
+  nenhum; a prévia do WhatsApp não o gasta). 30/10: o "🏬 Loja inteira" manda UM link para a
+  loja: #loja=<nome>&p=caixa.<código>.<token>,pesador.<código>.<token>… — a página pergunta
+  qual PC é este e usa o token e o código daquele PC (cada PC continua com 1 download). Só o clique em "Baixar" gasta: POST na
   Edge instalador-baixar, que devolve um endereço assinado do arquivo (5 min).
 -->
 <style>
@@ -31,6 +33,8 @@
   a { color: var(--ouro); }
   .acesso { color: var(--texto); font-weight: 600; }
   .codigo { margin-top: 14px; padding: 12px; border: 1px solid var(--borda); border-radius: 12px; text-align: center; }
+  .escolha button { margin-top: 10px; background: transparent; color: var(--texto); border: 1px solid var(--borda); text-align: left; font-size: 17px; }
+  .escolha button.sel { border-color: var(--lima); background: #1c370b; }
   .codigo b { display: block; margin-top: 4px; font-family: ui-monospace, Consolas, monospace; font-size: 26px; letter-spacing: 3px; color: var(--ouro); }
 </style>
 </head>
@@ -39,6 +43,7 @@
   <h1>🌿 Instalador do PDV</h1>
   <p>Jardim das Ervas · com os drivers da balança e das impressoras (cerca de 107 MB).</p>
   <p id="acesso" class="acesso" hidden></p>
+  <div id="escolha" class="escolha" hidden><p class="acesso" id="escolha-titulo"></p><div id="escolha-pcs"></div></div>
   <p class="nota">Este link vale 24 horas e um download. Baixe no PC que vai ser instalado.</p>
   <button id="baixar" type="button">⬇ Baixar o instalador</button>
   <p id="msg" class="msg" role="status"></p>
@@ -60,6 +65,7 @@
     invalido: "Este link não está completo ou não existe. Peça um link novo ao escritório.",
     expirado: "Este link venceu (vale 24 horas). Peça um link novo ao escritório.",
     usado: "Este link já foi usado para baixar. Cada link vale um download — peça um novo ao escritório.",
+    usado_pc: "Este PC da lista já foi baixado em outro computador. Escolha outro PC da lista ou peça um link novo ao escritório.",
     indisponivel: "O instalador não está no servidor agora. Avise o escritório.",
     servidor: "O servidor não respondeu. Tente de novo em instantes (o link continua valendo)."
   };
@@ -69,22 +75,65 @@
   var ACESSOS = { caixa: "🧾 PDV Caixa", pesador: "⚖️ PDV Balança", cd: "📦 PDV CD", escritorio: "🏢 PDV Escritório" };
   var mc = /(?:^|[#&])c=([2-9A-HJKMNP-TV-Z]{12})(?:&|$)/.exec(location.hash || "");
   var ma = /(?:^|[#&])a=([a-z]+)(?:&|$)/.exec(location.hash || "");
-  if (mc) {
-    document.getElementById("codigo-valor").textContent = mc[1].replace(/(.{4})(?=.)/g, "$1-");
+  function mostrarCodigo(c) {
+    document.getElementById("codigo-valor").textContent = c.replace(/(.{4})(?=.)/g, "$1-");
     document.getElementById("codigo").hidden = false;
     document.getElementById("passo-convite").hidden = false;
     document.getElementById("passo-sem-convite").hidden = true;
   }
-  if (ma && Object.prototype.hasOwnProperty.call(ACESSOS, ma[1])) {
+  function mostrarAcesso(a, nome) {
     var ac = document.getElementById("acesso");
-    ac.textContent = "Este link instala: " + ACESSOS[ma[1]];
+    ac.textContent = "Este PC vai ser: " + ACESSOS[a] + (nome ? " · " + nome : "");
     ac.hidden = false;
   }
+  if (mc) mostrarCodigo(mc[1]);
+  if (ma && Object.prototype.hasOwnProperty.call(ACESSOS, ma[1])) mostrarAcesso(ma[1], "");
   var botao = document.getElementById("baixar");
   var msg = document.getElementById("msg");
   var depois = document.getElementById("depois");
   function mostrar(texto, classe) { msg.textContent = texto; msg.className = "msg" + (classe ? " " + classe : ""); }
-  if (!token) { botao.disabled = true; mostrar(MSG.invalido, "erro"); return; }
+  // 30/10: 🏬 um link para a loja inteira — escolhe qual PC é este
+  var mp = /(?:^|[#&])p=([a-z0-9A-Z._,-]+)(?:&|$)/.exec(location.hash || "");
+  var ml = /(?:^|[#&])loja=([^&]{1,180})(?:&|$)/.exec(location.hash || "");
+  if (mp) {
+    var loja = "";
+    try { loja = ml ? decodeURIComponent(ml[1]) : ""; } catch (e) { loja = ""; }
+    var pcs = [];
+    mp[1].split(",").forEach(function (x) {
+      var q = /^(caixa|pesador)\.([2-9A-HJKMNP-TV-Z]{12})\.([A-Za-z0-9_-]{30,80})$/.exec(x);
+      if (q) pcs.push({ acesso: q[1], codigo: q[2], token: q[3] });
+    });
+    var nC = pcs.filter(function (p) { return p.acesso === "caixa"; }).length, iC = 0, iB = 0;
+    var nB = pcs.length - nC;
+    pcs.forEach(function (p) {
+      p.nome = p.acesso === "caixa" ? (nC > 1 ? "Caixa " + (++iC) : "Caixa") : (nB > 1 ? "Balança " + (++iB) : "Balança");
+    });
+    if (pcs.length) {
+      token = "";
+      document.getElementById("escolha").hidden = false;
+      document.getElementById("escolha-titulo").textContent = (loja ? loja + ": " : "") + "qual PC é este?";
+      var lista = document.getElementById("escolha-pcs");
+      pcs.forEach(function (p) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = (p.acesso === "caixa" ? "🧾 " : "⚖️ ") + p.nome;
+        b.onclick = function () {
+          Array.prototype.forEach.call(lista.children, function (x) { x.className = ""; });
+          b.className = "sel";
+          token = p.token;
+          mostrarAcesso(p.acesso, p.nome + (loja ? " · " + loja : ""));
+          mostrarCodigo(p.codigo);
+          botao.disabled = false; botao.textContent = "⬇ Baixar o instalador"; mostrar("");
+        };
+        lista.appendChild(b);
+      });
+      var nota = document.querySelector(".nota");
+      if (nota) nota.textContent = "Este link vale 24 horas. Cada PC da lista vale um download: abra o link em cada PC da loja.";
+      botao.disabled = true;
+      mostrar("Toque no PC que você está instalando agora. Cada PC da loja usa a sua opção uma vez.");
+    }
+  }
+  if (!token && !mp) { botao.disabled = true; mostrar(MSG.invalido, "erro"); return; }
   botao.onclick = function () {
     botao.disabled = true;
     mostrar("Preparando o download…");
@@ -100,7 +149,8 @@
           // pode baixar de novo por 15 minutos se o download cair no meio
           setTimeout(function () { botao.disabled = false; botao.textContent = "⬇ Baixar de novo"; }, 5000);
         } else {
-          mostrar(MSG[(r && r.erro) || "servidor"] || MSG.servidor, "erro");
+          var e = (r && r.erro) || "servidor";
+          mostrar((mp && e === "usado" ? MSG.usado_pc : MSG[e]) || MSG.servidor, "erro");
           if (r && r.erro === "servidor") botao.disabled = false;
         }
       })
