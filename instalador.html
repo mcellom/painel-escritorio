@@ -49,11 +49,11 @@
   <p id="msg" class="msg" role="status"></p>
   <div id="depois" hidden>
     <ol>
-      <li>Abra o arquivo <b>JardimDasErvas-PDV-Setup.exe</b> que baixou.</li>
+      <li>Abra o arquivo <b id="nome-arquivo">JardimDasErvas-PDV-Setup.exe</b> que baixou.</li>
       <li>Se o Windows mostrar "O Windows protegeu o computador", toque em <b>Mais informações → Executar assim mesmo</b>.</li>
       <li>Escolha <b>Loja</b> (ou CD / Escritório) e siga até o fim.</li>
       <li id="passo-sem-convite">No 1º uso, toque em <b>🧰 Pedir a instalação ao escritório</b> e digite o código da empresa.</li>
-      <li id="passo-convite" hidden>No 1º uso, toque em <b>✉️ Tenho um convite</b> e digite o código abaixo. Aparecem 4 números: confira com quem mandou o link.</li>
+      <li id="passo-convite" hidden>No 1º uso o PDV já usa o convite sozinho. Se ele pedir, toque em <b>✉️ Tenho um convite</b> e digite o código abaixo.</li>
     </ol>
   </div>
   <p id="codigo" class="codigo" hidden>Código do convite: <b id="codigo-valor"></b></p>
@@ -75,6 +75,17 @@
   var ACESSOS = { caixa: "🧾 PDV Caixa", pesador: "⚖️ PDV Balança", cd: "📦 PDV CD", escritorio: "🏢 PDV Escritório" };
   var mc = /(?:^|[#&])c=([2-9A-HJKMNP-TV-Z]{12})(?:&|$)/.exec(location.hash || "");
   var ma = /(?:^|[#&])a=([a-z]+)(?:&|$)/.exec(location.hash || "");
+  // 30/10 (etapa 2): o código e o uso vão no NOME do arquivo baixado; o instalador lê
+  // o próprio nome e grava o convite para o PDV usar sozinho (ninguém digita nada)
+  var atual = { codigo: mc ? mc[1] : "", acesso: ma && Object.prototype.hasOwnProperty.call(ACESSOS, ma[1]) ? ma[1] : "" };
+  function nomeDoArquivo() {
+    return atual.codigo && atual.acesso ? "JardimDasErvas-PDV-Setup_" + atual.acesso + "_" + atual.codigo + ".exe" : "";
+  }
+  function comNome(url) {
+    var nome = nomeDoArquivo();
+    if (!nome) return url;
+    try { var u = new URL(url); u.searchParams.set("download", nome); return u.toString(); } catch (e) { return url; }
+  }
   function mostrarCodigo(c) {
     document.getElementById("codigo-valor").textContent = c.replace(/(.{4})(?=.)/g, "$1-");
     document.getElementById("codigo").hidden = false;
@@ -121,6 +132,7 @@
           Array.prototype.forEach.call(lista.children, function (x) { x.className = ""; });
           b.className = "sel";
           token = p.token;
+          atual = { codigo: p.codigo, acesso: p.acesso };
           mostrarAcesso(p.acesso, p.nome + (loja ? " · " + loja : ""));
           mostrarCodigo(p.codigo);
           botao.disabled = false; botao.textContent = "⬇ Baixar o instalador"; mostrar("");
@@ -141,6 +153,8 @@
       .then(function (r) { return r.json().catch(function () { return { erro: "servidor" }; }); })
       .then(function (r) {
         if (r && r.ok && r.url) {
+          r.url = comNome(r.url);
+          if (nomeDoArquivo()) document.getElementById("nome-arquivo").textContent = nomeDoArquivo();
           mostrar("✓ O download começou. Se não começar, ", "ok");
           var a = document.createElement("a"); a.href = r.url; a.textContent = "toque aqui"; a.rel = "noopener";
           msg.appendChild(a); msg.appendChild(document.createTextNode(" (vale 5 minutos)."));
