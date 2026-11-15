@@ -15,6 +15,9 @@
   loja: #loja=<nome>&p=caixa.<código>.<token>,pesador.<código>.<token>… — a página pergunta
   qual PC é este e usa o token e o código daquele PC (cada PC continua com 1 download). Só o clique em "Baixar" gasta: POST na
   Edge instalador-baixar, que devolve um endereço assinado do arquivo (5 min).
+  15/11 (0478): SEM #t= a página vira o INSTALADOR PERMANENTE: o clique faz POST {generico:true}
+  (não gasta nada; limite por IP). O código da empresa NUNCA aparece aqui (quem manda é o
+  escritório, em mensagem); cada PC novo ainda pede a aprovação no Painel.
 -->
 <style>
   :root { --bg: #061009; --card: #07160d; --borda: #526034; --ouro: #e3c675; --lima: #b6da39; --texto: #f0ede5; --sec: #cfc8b8; --mudo: #92998a; --erro: #ff8a70; }
@@ -44,7 +47,16 @@
   <p>Jardim das Ervas · com os drivers da balança e das impressoras (cerca de 107 MB).</p>
   <p id="acesso" class="acesso" hidden></p>
   <div id="escolha" class="escolha" hidden><p class="acesso" id="escolha-titulo"></p><div id="escolha-pcs"></div></div>
-  <p class="nota">Este link vale 24 horas e um download. Baixe no PC que vai ser instalado.</p>
+  <p class="nota" id="nota">Este link vale 24 horas e um download. Baixe no PC que vai ser instalado.</p>
+  <div id="passos-generico" hidden>
+    <p class="acesso">Serve para Caixa e Balança. O escritório escolhe a loja e o uso na hora de autorizar.</p>
+    <ol>
+      <li>Toque em <b>Baixar o instalador</b>, aqui embaixo, no PC que vai ser instalado.</li>
+      <li>Abra o arquivo que baixou. Se o Windows mostrar "O Windows protegeu o computador", toque em <b>Mais informações → Executar assim mesmo</b>.</li>
+      <li>No 1º uso, toque em <b>🧰 Pedir a instalação ao escritório</b> e digite o <b>código da empresa</b> (peça ao escritório).</li>
+      <li>Anote os <b>4 números</b> que aparecerem e avise o escritório. Quando eles autorizarem, o PC termina sozinho.</li>
+    </ol>
+  </div>
   <button id="baixar" type="button">⬇ Baixar o instalador</button>
   <p id="msg" class="msg" role="status"></p>
   <div id="depois" hidden>
@@ -67,7 +79,8 @@
     usado: "Este link já foi usado para baixar. Cada link vale um download — peça um novo ao escritório.",
     usado_pc: "Este PC da lista já foi baixado em outro computador. Escolha outro PC da lista ou peça um link novo ao escritório.",
     indisponivel: "O instalador não está no servidor agora. Avise o escritório.",
-    servidor: "O servidor não respondeu. Tente de novo em instantes (o link continua valendo)."
+    servidor: "O servidor não respondeu. Tente de novo em instantes (o link continua valendo).",
+    limite: "Muitos downloads deste lugar na última hora. Espere um pouco e tente de novo."
   };
   var m = /(?:^|[#&])t=([A-Za-z0-9_-]{30,80})/.exec(location.hash || "");
   var token = m ? m[1] : "";
@@ -145,11 +158,23 @@
       mostrar("Toque no PC que você está instalando agora. Cada PC da loja usa a sua opção uma vez.");
     }
   }
-  if (!token && !mp) { botao.disabled = true; mostrar(MSG.invalido, "erro"); return; }
+  // 15/11 (0478): sem token e sem lista de PCs = o instalador permanente (link fixo)
+  // só a página SEM hash vira o permanente; #t= truncado/inválido ou #p= sem entrada válida = link inválido
+  var semHash = !location.hash || location.hash === "#";
+  var generico = !token && semHash;
+  if (!token && !generico && !(mp && document.getElementById("escolha").hidden === false)) {
+    botao.disabled = true; mostrar(MSG.invalido, "erro"); return;
+  }
+  if (generico) {
+    document.getElementById("passos-generico").hidden = false;
+    document.getElementById("nota").textContent = "Este link é permanente: pode baixar quando precisar. Cada PC novo só entra depois da autorização do escritório.";
+    document.getElementById("passo-sem-convite").hidden = true;
+    document.getElementById("passo-convite").hidden = true;
+  }
   botao.onclick = function () {
     botao.disabled = true;
     mostrar("Preparando o download…");
-    fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t: token }) })
+    fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(generico ? { generico: true } : { t: token }) })
       .then(function (r) { return r.json().catch(function () { return { erro: "servidor" }; }); })
       .then(function (r) {
         if (r && r.ok && r.url) {
@@ -158,14 +183,14 @@
           mostrar("✓ O download começou. Se não começar, ", "ok");
           var a = document.createElement("a"); a.href = r.url; a.textContent = "toque aqui"; a.rel = "noopener";
           msg.appendChild(a); msg.appendChild(document.createTextNode(" (vale 5 minutos)."));
-          depois.hidden = false;
+          depois.hidden = generico; // no link fixo os passos já estão em cima
           location.href = r.url;
           // pode baixar de novo por 15 minutos se o download cair no meio
           setTimeout(function () { botao.disabled = false; botao.textContent = "⬇ Baixar de novo"; }, 5000);
         } else {
           var e = (r && r.erro) || "servidor";
           mostrar((mp && e === "usado" ? MSG.usado_pc : MSG[e]) || MSG.servidor, "erro");
-          if (r && r.erro === "servidor") botao.disabled = false;
+          if (r && (r.erro === "servidor" || r.erro === "limite" || (generico && r.erro === "indisponivel"))) botao.disabled = false;
         }
       })
       .catch(function () { mostrar(MSG.servidor, "erro"); botao.disabled = false; });
