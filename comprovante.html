@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Comprovante do gasto — Jardim das Ervas</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!--
+  📸 FOTO DO COMPROVANTE do Gasto da loja (21/10/2026 — issue #133, migration 0195).
+  O PDV Caixa mostra um QR com comprovante.html#g=<chave do gasto>&t=<token>. O token
+  fica no # (não vai a servidor nenhum até a pessoa ENVIAR a foto). A foto é reduzida
+  aqui no celular (lado maior 1600 px, JPEG) e vai por POST à Edge comprovante-gasto,
+  que confere o token (24 h) e guarda num lugar privado. Nada se apaga: foto ruim =
+  manda outra. Espelho dos limites: packages/core/src/comprovante-gasto.ts.
+-->
+<style>
+  :root { --bg: #061009; --card: #07160d; --card2: #0d1a10; --borda: #526034; --sutil: #354323; --ouro: #e3c675; --lima: #b6da39; --lima2: #91c82d; --texto: #f0ede5; --sec: #cfc8b8; --mudo: #92998a; --erro: #ff8a70; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); }
+  body { min-height: 100vh; padding: 16px; color: var(--texto); font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: linear-gradient(130deg, #081a0d, #020a06) fixed; }
+  main { width: 100%; max-width: 480px; margin: 0 auto; }
+  .marca { font: 700 20px Georgia, "Cormorant Garamond", serif; color: var(--ouro); margin: 4px 0 14px; letter-spacing: .3px; }
+  .marca b { color: var(--lima); }
+  h1 { font: 600 26px Georgia, "Cormorant Garamond", serif; color: var(--ouro); margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--borda); border-radius: 14px; padding: 6px 16px; margin-bottom: 14px; }
+  .linha { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--sutil); font-size: 15px; color: var(--sec); }
+  .linha:last-child { border-bottom: 0; }
+  .linha span:last-child { color: var(--texto); text-align: right; overflow-wrap: anywhere; }
+  .valor { font: 700 22px Georgia, "Cormorant Garamond", serif; color: var(--ouro) !important; font-variant-numeric: lining-nums tabular-nums; }
+  .cam { border: 2px dashed var(--lima); border-radius: 14px; padding: 18px 12px; text-align: center; background: var(--card2); }
+  .cam .ic { font-size: 40px; }
+  .cam img { display: block; max-width: 100%; max-height: 360px; margin: 0 auto; border-radius: 8px; }
+  p { line-height: 1.45; color: var(--sec); margin: 6px 0; }
+  .nota { font-size: 13px; color: var(--mudo); }
+  .btn { display: block; width: 100%; margin-top: 12px; padding: 16px; border-radius: 12px; font: 700 17px inherit; font-family: inherit; cursor: pointer; text-align: center; }
+  .prim { border: 0; background: linear-gradient(180deg, var(--lima), var(--lima2)); color: #0b1406; }
+  .sec { border: 1px solid var(--borda); background: #152111; color: var(--texto); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  input[type=file] { display: none; }
+  .msg { margin-top: 14px; font-weight: 600; min-height: 1.2em; }
+  .msg.erro { color: var(--erro); }
+  .msg.ok { color: var(--lima); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="marca"><b>•</b> Jardim das Ervas</div>
+  <h1>Comprovante do gasto</h1>
+  <div class="card" id="dados" hidden>
+    <div class="linha"><span>Loja</span><span id="loja"></span></div>
+    <div class="linha"><span>Valor</span><span class="valor" id="valor"></span></div>
+    <div class="linha"><span>Motivo</span><span id="motivo"></span></div>
+    <div class="linha" id="linhaFotos" hidden><span>Fotos já enviadas</span><span id="fotos"></span></div>
+  </div>
+
+  <div id="escolher" hidden>
+    <div class="cam" id="cam">
+      <div class="ic">📷</div>
+      <p><b>Tirar foto da nota ou recibo</b></p>
+      <p class="nota">Deixe a nota inteira na foto, com o valor e a data aparecendo.</p>
+    </div>
+    <label class="btn prim" for="camera">📷 Abrir a câmera</label>
+    <input id="camera" type="file" accept="image/*" capture="environment">
+    <label class="btn sec" for="galeria">🖼 Escolher da galeria</label>
+    <input id="galeria" type="file" accept="image/*">
+  </div>
+
+  <div id="conferir" hidden>
+    <div class="cam"><img id="previa" alt="Foto do comprovante"></div>
+    <button class="btn prim" id="enviar" type="button">✓ Enviar esta foto</button>
+    <button class="btn sec" id="outra" type="button">↺ Tirar outra</button>
+  </div>
+
+  <div id="pronto" hidden>
+    <p class="msg ok">✓ Foto enviada! Já aparece no caixa e no alerta do gerente.</p>
+    <p>Agora guarde a nota junto com o papel "Vale de gasto" no cofre.</p>
+    <button class="btn sec" id="mais" type="button">📷 Enviar outra foto deste gasto</button>
+  </div>
+
+  <p id="msg" class="msg" role="status"></p>
+  <p class="nota" id="rodape">A foto é reduzida antes de enviar (rápido mesmo com 4G fraco). Este link só serve para este gasto e vale 24 horas.</p>
+</main>
+<script>
+(function () {
+  var API = "https://osnhrryofwcqwzqgrxuc.supabase.co/functions/v1/comprovante-gasto";
+  var LADO_MAX = 1600, MAX_BYTES = 2500000; // espelho do core (comprovante-gasto.ts)
+  var MSG = {
+    invalido: "Este link não está completo ou não é deste gasto. Mostre o código de novo no caixa.",
+    expirado: "Este link venceu (vale 24 horas). Peça ao gerente para enviar a foto pelo Painel.",
+    aguardando: "O caixa ainda está enviando o gasto ao servidor. Espere 1 minuto e toque em Tentar de novo.",
+    limite: "Este gasto já tem fotos demais (10).",
+    servidor: "O servidor não respondeu. Tente de novo em instantes (o link continua valendo)."
+  };
+  var q = new URLSearchParams((location.hash || "").replace(/^#/, ""));
+  var g = q.get("g") || "", t = q.get("t") || "";
+  var $ = function (id) { return document.getElementById(id); };
+  var msg = $("msg");
+  var fotoBase64 = "";
+  function mostrar(texto, classe) { msg.textContent = texto; msg.className = "msg" + (classe ? " " + classe : ""); }
+  function reais(c) { return (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+  function etapa(nome) { ["escolher", "conferir", "pronto"].forEach(function (id) { $(id).hidden = id !== nome; }); }
+  function chamar(corpo) {
+    return fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })
+      .then(function (r) { return r.json().catch(function () { return { erro: "servidor" }; }); })
+      .catch(function () { return { erro: "servidor" }; });
+  }
+  function erroDe(r) { return (r && r.mensagem) || MSG[(r && r.erro) || "servidor"] || MSG.servidor; }
+  function botaoTentar() {
+    var b = document.createElement("button"); b.className = "btn sec"; b.type = "button"; b.textContent = "↻ Tentar de novo";
+    b.onclick = function () { b.remove(); carregar(); };
+    msg.after(b);
+  }
+
+  function carregar() {
+    if (!/^[A-Za-z0-9_-]{8,80}$/.test(g) || !/^[A-Za-z0-9_-]{40,64}$/.test(t)) { mostrar(MSG.invalido, "erro"); return; }
+    mostrar("Abrindo o gasto…");
+    chamar({ acao: "ver", g: g, t: t }).then(function (r) {
+      if (!r || !r.ok) { mostrar(erroDe(r), "erro"); if (r && (r.erro === "aguardando" || r.erro === "servidor")) botaoTentar(); return; }
+      mostrar("");
+      $("loja").textContent = r.loja || "—";
+      $("valor").textContent = reais(r.valor_centavos || 0);
+      $("motivo").textContent = r.motivo || "—";
+      $("fotos").textContent = String(r.fotos || 0);
+      $("linhaFotos").hidden = !r.fotos;
+      $("dados").hidden = false;
+      etapa("escolher");
+    });
+  }
+
+  // Reduz no aparelho: lado maior até 1600 px, JPEG. Se ainda passar do limite, aperta mais.
+  function reduzir(arquivo) {
+    return new Promise(function (ok, falha) {
+      var url = URL.createObjectURL(arquivo);
+      var img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth, h = img.naturalHeight, maior = Math.max(w, h);
+        if (maior > LADO_MAX) { var f = LADO_MAX / maior; w = Math.max(1, Math.round(w * f)); h = Math.max(1, Math.round(h * f)); }
+        var c = document.createElement("canvas"); c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        var tentar = function (qualidade) {
+          var dado = c.toDataURL("image/jpeg", qualidade);
+          var bytes = Math.floor((dado.length - dado.indexOf(",") - 1) * 3 / 4);
+          if (bytes > MAX_BYTES && qualidade > 0.35) return tentar(qualidade - 0.15);
+          if (bytes > MAX_BYTES) return falha(new Error("grande"));
+          ok(dado);
+        };
+        tentar(0.75);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); falha(new Error("imagem")); };
+      img.src = url;
+    });
+  }
+
+  function escolhido(ev) {
+    var arquivo = ev.target.files && ev.target.files[0];
+    ev.target.value = "";
+    if (!arquivo) return;
+    mostrar("Preparando a foto…");
+    reduzir(arquivo).then(function (dado) {
+      fotoBase64 = dado;
+      $("previa").src = dado;
+      mostrar("Confira se dá para ler o valor e a data.");
+      etapa("conferir");
+    }).catch(function () { mostrar("Não consegui abrir essa foto. Tire de novo.", "erro"); });
+  }
+  $("camera").onchange = escolhido;
+  $("galeria").onchange = escolhido;
+  $("outra").onclick = function () { fotoBase64 = ""; mostrar(""); etapa("escolher"); };
+  $("mais").onclick = function () { fotoBase64 = ""; mostrar(""); etapa("escolher"); };
+  $("enviar").onclick = function () {
+    var b = $("enviar");
+    if (!fotoBase64 || b.disabled) return;
+    b.disabled = true; $("outra").disabled = true;
+    mostrar("Enviando a foto…");
+    chamar({ acao: "enviar", g: g, t: t, foto: fotoBase64 }).then(function (r) {
+      b.disabled = false; $("outra").disabled = false;
+      if (!r || !r.ok) { mostrar(erroDe(r), "erro"); return; }
+      fotoBase64 = "";
+      $("fotos").textContent = String(r.fotos || 1);
+      $("linhaFotos").hidden = false;
+      mostrar("");
+      etapa("pronto");
+    });
+  };
+  carregar();
+})();
+</script>
+</body>
+</html>
